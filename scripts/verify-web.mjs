@@ -64,6 +64,7 @@ const checks = [
   ['native reset cancels saved medication reminders', nativeContext.includes('cancelMedicationReminders(notificationIds)')],
   ['native reminder scheduling rolls back partial work', nativeNotifications.includes('await cancelMedicationReminders(notificationIds)')],
   ['website CTAs have real destinations', !/(?:Download the App|Get Started Free|Choose Essential|Choose Family)[\s\S]{0,80}href=["']#["']/.test(landing) && landing.includes('href="app.html"')],
+  ['dashboard has no unconfigured domain or social links', !dashboard.includes('naknak.io') && dashboard.includes('mailto:naknak@gmail.com')],
   ['website states unavailable safety capabilities honestly', landing.includes('Remote alerts and automatic location sharing are still in development') && landing.includes('Fall detection (coming soon)')],
   ['external blank links are isolated', unsafeBlankAnchors.length === 0],
   ['HTML referrer fallback is present', [app, dashboard, landing].every((html) => html.includes('name="referrer"') && html.includes('strict-origin-when-cross-origin'))],
