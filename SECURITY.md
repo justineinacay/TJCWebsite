@@ -130,19 +130,12 @@ production use with real families, read this section before you do.
   whatever rate Supabase's own abuse protection allows. A dedicated
   limit (e.g., a Postgres function tracking attempts per IP, or an Edge
   Function) is the next hardening step if this app scales.
-- **Card/Stripe payments are now webhook-verified** — a `stripe-webhook`
-  Supabase Edge Function verifies Stripe's request signature, logs every
-  event to `naknak_payment_events` (keyed on Stripe's own event ID, so a
-  retried delivery can't double-activate a plan), and only then updates
-  the household's plan using the service-role key. The client never
-  self-reports a Stripe payment as successful — Stripe tells the server
-  directly. **GCash direct-transfer remains self-reported**, stated
-  plainly in its own UI, because there's no webhook Supabase can
-  subscribe to for a manual bank/e-wallet transfer — that's an inherent
-  limitation of that payment method, not something left unfinished. The
-  Stripe flow keeps a manual "I paid but it didn't activate" fallback
-  for cases where a webhook is delayed or fails to deliver, clearly
-  labeled in the UI as unverified.
+- **PayMongo upgrades are webhook-verified.** The checkout function first
+  verifies the caregiver's Supabase session and household membership. The
+  webhook rejects invalid or stale signatures, activates the plan with the
+  service-role key, and then records PayMongo's event ID for idempotency.
+  There is no browser-side self-activation fallback. Manual GCash transfers
+  remain a support-assisted process and do not activate a plan automatically.
 - **One caregiver = one household owner.** Multiple caregivers sharing
   one household (e.g., two siblings both caring for a parent) isn't
   wired up yet. Adding it is a small schema addition — an
@@ -163,6 +156,9 @@ production use with real families, read this section before you do.
       to your real deployed domain, not `localhost` (see `DEPLOY.md`).
 - [ ] Decide on and implement a per-device revocation flow before
       onboarding families who might lose a phone.
-- [ ] Decide whether self-reported payment activation is acceptable at
-      your current scale, or whether to prioritize the webhook-verified
-      version first.
+- [ ] Complete a PayMongo test-mode checkout and verify the signed webhook,
+      plan change, audit event, and duplicate-delivery behavior end to end.
+- [ ] Complete native-to-dashboard synchronization or publish the native
+      milestone explicitly as local-only.
+- [ ] Test SOS calling, reminders, notification cancellation, geolocation,
+      and offline relaunch on a physical iPhone before TestFlight release.

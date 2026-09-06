@@ -20,8 +20,10 @@ https://justineinacay.github.io/Naknak/
 Naknak/
 ├── index.html          # Full landing page (hero, about, features, how it works, pricing, FAQ)
 ├── app.html            # Stable entry for the current web app
+├── manifest.webmanifest # Install metadata for the web beta
+├── naknak-sw.js         # Offline/runtime cache and local notification worker
 ├── native/             # Expo/React Native app for iOS, Android, and web preview
-├── assets/
+├── Assets/
 │   ├── logo-badge.png   # Navbar / footer mark — white heart on red
 │   ├── logo-mark.png    # Red heart mark (spare, for other brand touchpoints)
 │   └── hero-family.jpg  # Hero section photo
@@ -69,17 +71,18 @@ See [`native/README.md`](native/README.md) for setup, device builds, and the cur
 
 Keep `index.html` at the repo root and the `assets/` folder alongside it — the page references images with relative paths (`assets/...`).
 
-## Features
+## Verified web capabilities
 
 - Fully responsive (mobile, tablet, desktop)
 - Light/dark mode toggle, remembered via `localStorage`
 - Scroll-reveal animations, respects `prefers-reduced-motion`
-- No external JS frameworks — vanilla HTML/CSS/JS, Google Fonts (Sora + Inter) via CDN
+- Installable web manifest and registered service worker
+- The compiled web app currently loads React and supporting libraries from CDNs; repeat offline use is supported after those resources have been cached, but a first-ever offline launch is not
 
 ## Notes
 
-- The "Google Play" / "App Store" buttons in the **How It Works** section are plain text pills, not the official trademarked badges — swap in the real store badge assets once live download links are ready.
-- Pricing, FAQ, and feature copy are placeholder-accurate as of the current draft — update `index.html` directly (no CMS or data file yet).
+- The native app is not yet listed on Google Play or the App Store. Store links must be added only after approved listings exist.
+- Remote push/SMS, automatic calling, automatic location sharing, native-to-dashboard synchronization, and fall detection remain beta or future capabilities and must not be presented as active.
 
 ## Tech Stack
 

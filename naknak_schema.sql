@@ -54,6 +54,14 @@ create table if not exists naknak_state (
   updated_at   timestamptz default now()
 );
 
+-- Index every foreign key and recurring RLS lookup used by the dashboard.
+create index if not exists naknak_households_created_by_idx
+  on naknak_households (created_by);
+create index if not exists naknak_household_members_auth_uid_idx
+  on naknak_household_members (auth_uid);
+create index if not exists naknak_devices_household_id_idx
+  on naknak_devices (household_id);
+
 -- ═══════════════════════════════════════════════════════════════════════
 --  ROW LEVEL SECURITY — deny by default, open only for caregivers via
 --  real membership. Devices never touch these tables directly.
@@ -68,34 +76,74 @@ drop policy if exists "auth user can create household"  on naknak_households;
 drop policy if exists "member can read own membership"  on naknak_household_members;
 drop policy if exists "member can read own state"        on naknak_state;
 drop policy if exists "member can write own state"       on naknak_state;
+drop policy if exists "member can insert own state"      on naknak_state;
+drop policy if exists "member can update own state"      on naknak_state;
+drop policy if exists "member can delete own state"      on naknak_state;
 drop policy if exists "member can read own devices"       on naknak_devices;
 
 create policy "auth user can create household" on naknak_households
-  for insert to authenticated with check (created_by = auth.uid());
+  for insert to authenticated with check (created_by = (select auth.uid()));
 
 create policy "member can read own household" on naknak_households
   for select to authenticated using (
-    id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
 create policy "member can read own membership" on naknak_household_members
-  for select to authenticated using (auth_uid = auth.uid());
+  for select to authenticated using (auth_uid = (select auth.uid()));
 
 create policy "member can read own state" on naknak_state
   for select to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
-create policy "member can write own state" on naknak_state
-  for all to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
-  ) with check (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+create policy "member can insert own state" on naknak_state
+  for insert to authenticated with check (
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
+
+create policy "member can update own state" on naknak_state
+  for update to authenticated using (
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
+  ) with check (
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
+  );
+
+create policy "member can delete own state" on naknak_state
+  for delete to authenticated using (
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
+  );
+
+-- Paid plan changes are authoritative only when made by the service-role
+-- credential held by the verified payment webhook. This also prevents a
+-- paired phone from changing `state.plan` through device_push_state.
+create or replace function protect_naknak_paid_plan()
+returns trigger
+language plpgsql
+security invoker
+set search_path = ''
+as $$
+declare
+  request_role text := current_setting('request.jwt.claim.role', true);
+begin
+  if request_role is distinct from 'service_role'
+     and old.state->'plan' is distinct from new.state->'plan' then
+    raise exception 'Plan changes require verified payment or support approval.';
+  end if;
+  return new;
+end;
+$$;
+
+revoke all on function protect_naknak_paid_plan() from public;
+
+drop trigger if exists protect_naknak_paid_plan on naknak_state;
+create trigger protect_naknak_paid_plan
+before update of state on naknak_state
+for each row execute function protect_naknak_paid_plan();
 
 create policy "member can read own devices" on naknak_devices
   for select to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
 -- No policies granted to `anon` on any table above — anon access is
@@ -234,9 +282,9 @@ revoke all on function pair_device(text,text) from public;
 revoke all on function device_get_state(text) from public;
 revoke all on function device_push_state(text,jsonb,bigint) from public;
 revoke all on function create_household(text) from public;
-grant execute on function pair_device(text,text) to anon, authenticated;
-grant execute on function device_get_state(text) to anon, authenticated;
-grant execute on function device_push_state(text,jsonb,bigint) to anon, authenticated;
+grant execute on function pair_device(text,text) to anon;
+grant execute on function device_get_state(text) to anon;
+grant execute on function device_push_state(text,jsonb,bigint) to anon;
 grant execute on function create_household(text) to authenticated;
 grant execute on function regenerate_pair_code(uuid) to authenticated;
 
@@ -255,21 +303,24 @@ create table if not exists naknak_letters (
   created_at timestamptz default now()
 );
 
+create index if not exists naknak_letters_household_id_idx
+  on naknak_letters (household_id);
+
 alter table naknak_letters enable row level security;
 
 create policy "member can read own letters" on naknak_letters
   for select to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
 create policy "member can write own letters" on naknak_letters
   for insert to authenticated with check (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
 create policy "member can delete own letters" on naknak_letters
   for delete to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );
 
 -- ═══════════════════════════════════════════════════════════════════════
@@ -290,9 +341,12 @@ create table if not exists naknak_payment_events (
   created_at timestamptz default now()
 );
 
+create index if not exists naknak_payment_events_household_id_idx
+  on naknak_payment_events (household_id);
+
 alter table naknak_payment_events enable row level security;
 
 create policy "member can read own payment events" on naknak_payment_events
   for select to authenticated using (
-    household_id in (select household_id from naknak_household_members where auth_uid = auth.uid())
+    household_id in (select household_id from naknak_household_members where auth_uid = (select auth.uid()))
   );

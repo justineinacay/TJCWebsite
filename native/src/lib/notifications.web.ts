@@ -7,4 +7,4 @@ export async function scheduleMedicationReminders(): Promise<ReminderScheduleRes
   return { enabled: false, notificationIds: [] };
 }
 
-export async function cancelMedicationReminders(): Promise<void> {}
+export async function cancelMedicationReminders(_notificationIds: string[]): Promise<void> {}

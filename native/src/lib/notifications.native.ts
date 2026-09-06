@@ -40,23 +40,28 @@ export async function scheduleMedicationReminders(
   if (!allowed) return { enabled: false, notificationIds: [] };
 
   const notificationIds: string[] = [];
-  for (const time of times) {
-    const [hour, minute] = time.split(':').map(Number);
-    const identifier = await Notifications.scheduleNotificationAsync({
-      content: {
-        title: 'Oras na ng gamot',
-        body: `${medicationName} ${dose} — buksan ang NakNak para mag-check in.`,
-        sound: true,
-        data: { kind: 'medication-reminder' },
-      },
-      trigger: {
-        type: Notifications.SchedulableTriggerInputTypes.DAILY,
-        hour,
-        minute,
-        channelId: 'medication-reminders',
-      },
-    });
-    notificationIds.push(identifier);
+  try {
+    for (const time of times) {
+      const [hour, minute] = time.split(':').map(Number);
+      const identifier = await Notifications.scheduleNotificationAsync({
+        content: {
+          title: 'Oras na ng gamot',
+          body: `${medicationName} ${dose} — buksan ang NakNak para mag-check in.`,
+          sound: true,
+          data: { kind: 'medication-reminder' },
+        },
+        trigger: {
+          type: Notifications.SchedulableTriggerInputTypes.DAILY,
+          hour,
+          minute,
+          channelId: 'medication-reminders',
+        },
+      });
+      notificationIds.push(identifier);
+    }
+  } catch (error) {
+    await cancelMedicationReminders(notificationIds);
+    throw error;
   }
 
   return { enabled: true, notificationIds };

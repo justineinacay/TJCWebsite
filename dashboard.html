@@ -5,7 +5,10 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — NakNak</title>
-<meta name="description" content="Ang NakNak caregiver dashboard. I-manage ang gamot, contacts, safe zone, at SOS alerts ng iyong senior — naka-sync sa totoong oras sa app.">
+<meta name="description" content="NakNak caregiver dashboard beta for managing household safety information. Native app synchronization and remote alerts are still in development.">
+<meta name="theme-color" content="#C4301E">
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="apple-touch-icon" href="Assets/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="Assets/logo-mark.png">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
@@ -631,7 +634,6 @@ const SUPA = { url: "https://louqshzgqutxydfqgnyz.supabase.co", anonKey: "eyJhbG
 // create-checkout-session Edge Function does. This just needs your
 // Supabase project's function URL (same project as SUPA.url below).
 const PAYMONGO_CHECKOUT_FN_URL = SUPA.url ? `${SUPA.url}/functions/v1/create-checkout-session` : "";
-const GCASH_NUMBER = "0961 184 2586";
 /* ═══════════════════════════════════════════════════════════════════════ */
 
 const supa = (SUPA.url && SUPA.anonKey) ? supabase.createClient(SUPA.url, SUPA.anonKey) : null;
@@ -660,8 +662,8 @@ const PLANS = {
     price:"₱0", priceSub:"Habambuhay na libre", features:["SOS button","Araw-araw na check-in","1 emergency contact","Offline Vault access"] },
   essential: { id:"essential", name:"Kailangan",    maxContacts:2, vitals:true,  safeZone:false, medications:true,  fall:false, multiMember:false,
     price:"₱100", priceSub:"Isang beses lang, hindi na babalikan", features:["Lahat ng nasa Libre","Medication tracking","2 emergency contacts","Vitals logging + charts","Smart escalation alerts"] },
-  family:    { id:"family",    name:"Pamilya",  maxContacts:3, vitals:true,  safeZone:true,  medications:true,  fall:true,  multiMember:true,
-    price:"₱199", priceSub:"/buwan", features:["Lahat ng nasa Essential","Fall Detection","Safe Zone GPS + live map","3 emergency contacts","Hanggang 4 na senior","Calendar + full sync"] },
+  family:    { id:"family",    name:"Pamilya",  maxContacts:3, vitals:true,  safeZone:true,  medications:true,  fall:false,  multiMember:true,
+    price:"₱199", priceSub:"/buwan", features:["Lahat ng nasa Essential","Fall detection (coming soon)","Safe Zone GPS beta","3 emergency contacts","Hanggang 4 na senior","Connected sync beta"] },
 };
 const canUse = (plan, feat) => PLANS[plan]?.[feat] ?? true;
 
@@ -1148,15 +1150,15 @@ function AuthShell({ children }) {
         <div className="auth-visual-inner">
           <div className="auth-visual-brand"><span className="ob-mark"><span className="ring"></span><span className="dot"></span></span>NakNak</div>
           <h1 className="auth-visual-title">Care that never sleeps.</h1>
-          <p className="auth-visual-sub">Real-time check-ins, SOS alerts, and a live family dashboard — everything you need to know they're safe, in one place.</p>
+          <p className="auth-visual-sub">A caregiver dashboard beta for organizing household safety information while native synchronization and remote alerts are still in development.</p>
           <ul className="auth-visual-list">
-            <li><span className="ic"><Icon name="sos" size={16} color="#fff"/></span>Real-time SOS alerts</li>
-            <li><span className="ic"><Icon name="pill" size={16} color="#fff"/></span>Medication reminders that never miss a dose</li>
+            <li><span className="ic"><Icon name="sos" size={16} color="#fff"/></span>Remote SOS alerts are still in beta</li>
+            <li><span className="ic"><Icon name="pill" size={16} color="#fff"/></span>Medication schedules and local reminders</li>
             <li><span className="ic"><Icon name="lock" size={16} color="#fff"/></span>Row-level security for every family</li>
           </ul>
           <div className="auth-visual-quote">
-            "NakNak gives me peace of mind knowing my mom is safe and her medications are never missed."
-            <strong>— Anne, Daughter</strong>
+            “Emergency actions should stay visible, direct, and honest about what is connected.”
+            <strong>— NakNak product principle</strong>
           </div>
           <div className="auth-visual-footer">
             <a href="https://naknak.io" target="_blank" rel="noopener noreferrer" className="auth-visual-site">naknak.io</a>
@@ -1407,7 +1409,9 @@ function Onboard({ onPaired }) {
 function Dashboard({ household, onDisconnect, theme, session }) {
   const [state, setState] = useState(null);
   const [activeSid, setActiveSid] = useState(null);
-  const [tab, setTab] = useState("overview");
+  const requestedTab = new URLSearchParams(window.location.search).get("tab");
+  const allowedTabs = ["overview","meds","contacts","safezone","vitals","notes","letters","profile","devices","calendar","timeline","idupload","qr","settings"];
+  const [tab, setTab] = useState(allowedTabs.includes(requestedTab) ? requestedTab : "overview");
   const [lastSync, setLastSync] = useState(null);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   // In-progress name/nickname edit for the active senior, so the tab bar and sidebar
@@ -1456,7 +1460,6 @@ function Dashboard({ household, onDisconnect, theme, session }) {
     return n||fn||"?";
   };
   const patch = (fn) => { const next = { ...state, seniors: state.seniors.map(s => s.id===senior.id ? fn({...s}) : s) }; pushState(next); };
-  const setPlan = (newPlan) => { pushState({ ...state, plan: newPlan }); };
   const addSenior = () => { const nm=(window.prompt("Pangalan ng bagong senior:")||"").trim(); const s=newSenior(nm||"Bagong Senior"); const next={...state, seniors:[...state.seniors, s]}; setActiveSid(s.id); pushState(next); };
   const ackSOS = () => patch(s => { s.status="ok"; s.eventLog=[{id:nid(),type:"checkin",icon:"checkmark",title:"SOS na-acknowledge ng caregiver",time:tNow(),detail:""},...(s.eventLog||[])]; return s; });
 
@@ -1565,7 +1568,7 @@ function Dashboard({ household, onDisconnect, theme, session }) {
           {tab==="timeline" && <div key="timeline" className="panel-enter"><TimelinePanel senior={senior}/></div>}
           {tab==="idupload" && <div key="idupload" className="panel-enter"><IdUploadPanel senior={senior} patch={patch}/></div>}
           {tab==="qr" && <div key="qr" className="panel-enter"><QrPanel senior={senior}/></div>}
-          {tab==="settings" && <div key="settings" className="panel-enter"><SettingsPanel theme={theme} plan={state.plan} session={session} onDisconnect={onDisconnect} setPlan={setPlan} household={household}/></div>}
+          {tab==="settings" && <div key="settings" className="panel-enter"><SettingsPanel theme={theme} plan={state.plan} session={session} onDisconnect={onDisconnect} household={household}/></div>}
         </div>
       </div>
     </div>
@@ -2004,7 +2007,7 @@ function SafeZonePanel({ senior, patch }) {
     <>
       <div className="panel">
         <div className="panel-head">
-          <div><h2><Icon name="map_pin" size={17}/>Safe Zone GPS</h2><p>Live na lokasyon — nag-a-update tuwing 5 minuto habang bukas ang app ng senior</p></div>
+          <div><h2><Icon name="map_pin" size={17}/>Safe Zone GPS Beta</h2><p>Web beta location only while the paired web app is open and permission is granted. Hindi pa ito konektado sa native app.</p></div>
         </div>
         <SafeZoneMap gps={gps} zone={z}/>
         <div className="map-status-row">
@@ -2640,12 +2643,10 @@ function QrPanel({ senior }) {
 }
 
 /* ── SETTINGS: theme, plan, account ─────────────────────────────────────── */
-function SettingsPanel({ theme, plan, session, onDisconnect, setPlan, household }) {
+function SettingsPanel({ theme, plan, session, onDisconnect, household }) {
   const PLAN_LABEL = { free:"Libre", essential:"Kailangan", family:"Pamilya" };
   const PLAN_COLOR = { free:"var(--ink3)", essential:"var(--gold)", family:"var(--green)" };
   const [checkout, setCheckout] = useState(null); // { planId, method:'paymongo'|'gcash' } or null
-  const [copied, setCopied] = useState(false);
-  const [showFallback, setShowFallback] = useState(false);
   const [checkoutError, setCheckoutError] = useState("");
   const [creatingCheckout, setCreatingCheckout] = useState(false);
 
@@ -2653,9 +2654,14 @@ function SettingsPanel({ theme, plan, session, onDisconnect, setPlan, household 
     if(!PAYMONGO_CHECKOUT_FN_URL) return;
     setCreatingCheckout(true); setCheckoutError("");
     try {
+      if(!session?.access_token) throw new Error("Mag-sign in ulit bago magbayad.");
       const res = await fetch(PAYMONGO_CHECKOUT_FN_URL, {
         method: "POST",
-        headers: { "Content-Type": "application/json", "Authorization": `Bearer ${SUPA.anonKey}` },
+        headers: {
+          "Content-Type": "application/json",
+          "apikey": SUPA.anonKey,
+          "Authorization": `Bearer ${session.access_token}`,
+        },
         body: JSON.stringify({ household_id: household?.householdId, plan: planId }),
       });
       const data = await res.json();
@@ -2664,16 +2670,12 @@ function SettingsPanel({ theme, plan, session, onDisconnect, setPlan, household 
       // Keep the new tab isolated so it cannot reach back through window.opener.
       window.open(data.checkout_url, "_blank", "noopener,noreferrer");
       setCheckout({ planId, method:"paymongo" });
-      setShowFallback(false);
     } catch(err) {
       setCheckoutError(err.message || "May problema sa pagbukas ng payment. Subukan ulit.");
     } finally {
       setCreatingCheckout(false);
     }
   };
-  const startGcash = (planId) => setCheckout({ planId, method:"gcash" });
-  const confirmActivation = (planId) => { setPlan(planId); setCheckout(null); setShowFallback(false); };
-  const copyGcash = () => { navigator.clipboard && navigator.clipboard.writeText(GCASH_NUMBER.replace(/\s/g,"")); setCopied(true); setTimeout(()=>setCopied(false),1800); };
 
   return (
     <>
@@ -2728,36 +2730,19 @@ function SettingsPanel({ theme, plan, session, onDisconnect, setPlan, household 
                 {isCurrent ? (
                   <div style={{textAlign:"center",fontSize:12,fontWeight:700,color:"var(--ink3)",padding:"10px 0"}}>Ito ang aktibong plano mo</div>
                 ) : isFree ? (
-                  <button className="btn-cancel" style={{width:"100%"}} onClick={()=>setPlan("free")}>Bumaba sa Libre</button>
+                  <a className="btn-cancel" style={{width:"100%",display:"block",textAlign:"center"}} href="mailto:naknak@gmail.com?subject=NakNak%20plan%20downgrade">Humiling ng downgrade</a>
                 ) : checkout?.planId===p.id && checkout?.method==="paymongo" ? (
                   <div style={{background:"var(--cream2)",borderRadius:12,padding:"14px",textAlign:"center"}}>
                     <div className="loading-spin" style={{width:22,height:22,marginBottom:10}}></div>
                     <p style={{fontSize:12,fontWeight:600,color:"var(--ink2)",marginBottom:10,lineHeight:1.6}}>Nabuksan ang PayMongo checkout sa bagong tab. Kapag kumpirmado ang bayad, awtomatikong mag-a-activate ang plan mo — hindi mo na kailangang gawin pa.</p>
-                    {!showFallback ? (
-                      <button onClick={()=>setShowFallback(true)} style={{background:"none",border:"none",color:"var(--ink3)",fontSize:11,fontWeight:600,textDecoration:"underline",cursor:"pointer"}}>Nagbayad ka na pero hindi pa nag-a-update?</button>
-                    ) : (
-                      <>
-                        <p style={{fontSize:10.5,fontWeight:600,color:"var(--ink3)",marginBottom:8,lineHeight:1.5}}>Kung ilang minuto na at hindi pa rin na-activate, puwede mong i-confirm nang manual. (Ito ay hindi na-verify ng PayMongo automatically — gagamitin lang ito bilang backup.)</p>
-                        <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>confirmActivation(p.id)}>Nabayaran ko na — i-activate</button>
-                      </>
-                    )}
-                    <button className="btn-cancel" style={{width:"100%",marginTop:8}} onClick={()=>{setCheckout(null);setShowFallback(false);}}>Isara</button>
-                  </div>
-                ) : checkout?.planId===p.id && checkout?.method==="gcash" ? (
-                  <div style={{background:"var(--cream2)",borderRadius:12,padding:"14px",textAlign:"center"}}>
-                    <div style={{fontSize:10.5,fontWeight:500,color:"var(--ink3)",letterSpacing:"0.01em",marginBottom:6}}>MAGPADALA SA GCASH</div>
-                    <div style={{fontFamily:"var(--font-mono)",fontSize:19,fontWeight:700,color:"var(--ink)",letterSpacing:"-0.01em",fontVariantNumeric:"tabular-nums",marginBottom:4}}>{GCASH_NUMBER}</div>
-                    <div style={{fontSize:11,fontWeight:600,color:"var(--ink3)",marginBottom:10}}>Halagang ipadala: {p.price}</div>
-                    <button className="btn-cancel" style={{width:"100%",marginBottom:8}} onClick={copyGcash}>{copied?"Nakopya!":"Kopyahin ang numero"}</button>
-                    <p style={{fontSize:11,fontWeight:600,color:"var(--ink2)",marginBottom:10,lineHeight:1.5}}>Pagkatapos magpadala, pindutin ito:</p>
-                    <button className="btn-save" style={{width:"100%",marginBottom:8}} onClick={()=>confirmActivation(p.id)}>Nabayaran ko na — i-activate</button>
-                    <button className="btn-cancel" style={{width:"100%"}} onClick={()=>setCheckout(null)}>Kanselahin</button>
+                    <a href="mailto:naknak@gmail.com?subject=NakNak%20payment%20support" style={{display:"inline-block",color:"var(--accent)",fontSize:11,fontWeight:700,textDecoration:"underline",marginBottom:8}}>Kailangan ng tulong sa bayad?</a>
+                    <button className="btn-cancel" style={{width:"100%"}} onClick={()=>setCheckout(null)}>Isara</button>
                   </div>
                 ) : (
                   <div style={{display:"flex",flexDirection:"column",gap:8}}>
                     {checkoutError && <div style={{fontSize:11,fontWeight:600,color:"var(--red)",marginBottom:2}}>{checkoutError}</div>}
                     {PAYMONGO_CHECKOUT_FN_URL && <button className="btn-save" style={{width:"100%"}} disabled={creatingCheckout} onClick={()=>startCheckout(p.id)}>{creatingCheckout?"…":"Bayaran Ngayon"}</button>}
-                    <button className={PAYMONGO_CHECKOUT_FN_URL?"btn-cancel":"btn-save"} style={{width:"100%"}} onClick={()=>startGcash(p.id)}>Magbayad via GCash</button>
+                    <a className={PAYMONGO_CHECKOUT_FN_URL?"btn-cancel":"btn-save"} style={{width:"100%",display:"block",textAlign:"center"}} href={`mailto:naknak@gmail.com?subject=NakNak%20manual%20GCash%20-%20${encodeURIComponent(p.name)}`}>Manual GCash support</a>
                   </div>
                 )}
               </div>
@@ -2765,7 +2750,7 @@ function SettingsPanel({ theme, plan, session, onDisconnect, setPlan, household 
           })}
         </div>
         <p style={{fontSize:11,color:"var(--ink3)",fontWeight:600,marginTop:16,lineHeight:1.6}}>
-          <Icon name="info" size={11} color="var(--ink3)"/> Ang pag-activate pagkatapos magbayad ay kasalukuyang manual — walang automated na payment verification pa. Kung may tanong sa bayad, makipag-ugnayan sa amin.
+          <Icon name="info" size={11} color="var(--ink3)"/> PayMongo upgrades activate only after its signed payment webhook confirms the payment. Manual GCash payments require support verification.
         </p>
       </div>
     </>
@@ -2891,6 +2876,11 @@ class ErrB extends React.Component{
 
 const root = ReactDOM.createRoot(document.getElementById("root"));
 root.render(<ErrB><App/></ErrB>);
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./naknak-sw.js').catch(() => undefined));
+}
 </script>
 </body>
 </html>

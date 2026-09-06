@@ -190,6 +190,9 @@ body[data-nak-mobility="1"] .nak-home-ok{min-height:64px!important}
 @media(prefers-reduced-motion:reduce){.nak-care-shell *{transition:none!important;animation:none!important}}
 </style>
 <meta name="referrer" content="strict-origin-when-cross-origin"/>
+<meta name="theme-color" content="#C4301E"/>
+<link rel="manifest" href="./manifest.webmanifest"/>
+<link rel="apple-touch-icon" href="./Assets/apple-touch-icon.png"/>
 </head>
 <body>
 <div class="beta-banner">
@@ -4442,6 +4445,11 @@ function NakNak() {
 
 const root = ReactDOM.createRoot(document.getElementById('root'));
 root.render(<AppErrorBoundary><NakNak/></AppErrorBoundary>);
+</script>
+<script>
+if ('serviceWorker' in navigator && location.protocol !== 'file:') {
+  window.addEventListener('load', () => navigator.serviceWorker.register('./naknak-sw.js').catch(() => undefined));
+}
 </script>
 </body>
 </html>

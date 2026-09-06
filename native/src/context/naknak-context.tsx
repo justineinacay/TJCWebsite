@@ -9,6 +9,7 @@ import {
 } from 'react';
 
 import { clearState, loadState, saveState } from '@/lib/storage';
+import { cancelMedicationReminders } from '@/lib/notifications';
 import {
   AccessibilityNeed,
   EmergencyContact,
@@ -167,9 +168,11 @@ export function NakNakProvider({ children }: PropsWithChildren) {
   }, [appendEvent]);
 
   const resetApp = useCallback(async () => {
+    const notificationIds = state.medications.flatMap((medication) => medication.notificationIds);
+    await cancelMedicationReminders(notificationIds);
     await clearState();
     setState(INITIAL_STATE);
-  }, []);
+  }, [state.medications]);
 
   const value = useMemo<NakNakContextValue>(
     () => ({

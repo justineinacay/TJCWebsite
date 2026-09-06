@@ -1,0 +1,4 @@
+.DS_Store
+.impeccable/
+native/node_modules/
+native/.expo/
