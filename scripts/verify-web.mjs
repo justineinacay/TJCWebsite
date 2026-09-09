@@ -75,6 +75,7 @@ const checks = [
   ['native SOS does not imply guaranteed push delivery', nativeSos.includes('Hindi nito ginagarantiya na may push notification na natanggap.')],
   ['native phone can revoke its own secret', nativeContext.includes('disconnectNativeDevice') && revocationMigration.includes('native_device_disconnect')],
   ['caregiver can revoke a household device', dashboard.includes('revoke_household_device') && dashboard.includes('I-disconnect') && revocationMigration.includes('(select auth.uid())')],
+  ['dashboard describes native status sync without implying push alerts', dashboard.includes('Confirmed Ayos Ako and SOS dashboard status') && dashboard.includes('Remote push, SMS, and automatic calling are not active.')],
   ['native reset cancels saved medication reminders', nativeContext.includes('cancelMedicationReminders(notificationIds)')],
   ['native reminder scheduling rolls back partial work', nativeNotifications.includes('await cancelMedicationReminders(notificationIds)')],
   ['website CTAs have real destinations', !/(?:Download the App|Get Started Free|Choose Essential|Choose Family)[\s\S]{0,80}href=["']#["']/.test(landing) && landing.includes('href="app.html"')],
