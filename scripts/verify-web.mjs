@@ -58,6 +58,7 @@ const checks = [
   ['security.txt has a future expiration', (() => { const value = security.match(/^Expires:\s+(.+)$/m)?.[1]; return !!value && Number.isFinite(Date.parse(value)) && Date.parse(value) > Date.now(); })()],
   ['security.txt points to the security policy', /^Policy:\s+https:\/\/github\.com\/justineinacay\/Naknak\/blob\/main\/SECURITY\.md$/m.test(security)],
   ['checkout tab is opened with noopener and noreferrer', dashboard.includes('window.open(data.checkout_url, "_blank", "noopener,noreferrer")')],
+  ['raw file dashboard redirects to the supported HTTPS deployment', dashboard.includes("window.location.protocol === 'file:'") && dashboard.includes("https://justineinacay.github.io/Naknak/dashboard.html") && dashboard.includes('window.location.replace(liveDashboard.href)')],
   ['checkout uses the signed-in caregiver token', dashboard.includes('Bearer ${session.access_token}') && !dashboard.includes('Bearer ${SUPA.anonKey}')],
   ['checkout function verifies the user and household membership', checkoutFunction.includes('auth.getUser(accessToken)') && checkoutFunction.includes('naknak_household_members')],
   ['checkout returns to the configured project base path', checkoutFunction.includes('new URL("dashboard.html?tab=settings&paid=1", siteBase)')],

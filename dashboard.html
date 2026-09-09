@@ -5,8 +5,16 @@
 <meta name="referrer" content="strict-origin-when-cross-origin">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Dashboard — NakNak</title>
-<meta name="description" content="NakNak caregiver dashboard beta for managing household safety information. Native app synchronization and remote alerts are still in development.">
+<meta name="description" content="NakNak Caregiver / Anak dashboard for household safety information and confirmed native Ayos Ako and SOS status. Remote push, SMS, and automatic calling are not active.">
 <meta name="theme-color" content="#C4301E">
+<script>
+if (window.location.protocol === 'file:') {
+  const liveDashboard = new URL('https://justineinacay.github.io/Naknak/dashboard.html');
+  liveDashboard.search = window.location.search;
+  liveDashboard.hash = window.location.hash;
+  window.location.replace(liveDashboard.href);
+}
+</script>
 <link rel="manifest" href="manifest.webmanifest">
 <link rel="apple-touch-icon" href="Assets/apple-touch-icon.png">
 <link rel="icon" type="image/png" href="Assets/logo-mark.png">
