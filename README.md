@@ -4,7 +4,7 @@
 
 NakNak is a Filipino safety and support app for Senior Citizens, Persons with Disabilities (PWDs), and their Caregiver / Anak.
 
-This repository now contains the existing web experience and an Expo/React Native app under `native/`. Remote caregiver alerts are still in development; the product does not yet claim SMS, automatic calling, remote push, location sharing, or fall detection.
+This repository contains the web experience and an Expo/React Native app under `native/`. A paired native phone can now send server-confirmed **Ayos Ako** and **SOS opened** status to its assigned Senior/PWD record in the Caregiver / Anak dashboard. Remote push, SMS, automatic calling, location sharing, and fall detection remain unimplemented and are never implied by that status sync.
 
 ## Live Preview
 
@@ -82,7 +82,7 @@ Keep `index.html` at the repo root and the `assets/` folder alongside it — the
 ## Notes
 
 - The native app is not yet listed on Google Play or the App Store. Store links must be added only after approved listings exist.
-- Remote push/SMS, automatic calling, automatic location sharing, native-to-dashboard synchronization, and fall detection remain beta or future capabilities and must not be presented as active.
+- Remote push/SMS, automatic calling, automatic location sharing, medication/contact sync, and fall detection remain beta or future capabilities and must not be presented as active. Native dashboard sync is currently limited to confirmed Ayos Ako and SOS-opened status.
 
 ## Tech Stack
 

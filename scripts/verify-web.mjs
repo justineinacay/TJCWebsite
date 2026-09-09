@@ -3,7 +3,7 @@ import { readFile } from 'node:fs/promises';
 const repositoryRoot = new URL('../', import.meta.url);
 const read = (path) => readFile(new URL(path, repositoryRoot), 'utf8');
 
-const [entry, v15, app, serviceWorker, security, dashboard, landing, manifest, checkoutFunction, webhookFunction, planMigration, rlsMigration, rpcMigration, nativeContext, nativeNotifications] = await Promise.all([
+const [entry, v15, app, serviceWorker, security, dashboard, landing, manifest, checkoutFunction, webhookFunction, planMigration, rlsMigration, rpcMigration, nativeSyncMigration, revocationMigration, nativeContext, nativeNotifications, nativeFamilySync, nativePairing, nativeHome, nativeSos] = await Promise.all([
   read('app.html'),
   read('app-v15.html'),
   read('naknak-app.html'),
@@ -17,8 +17,14 @@ const [entry, v15, app, serviceWorker, security, dashboard, landing, manifest, c
   read('supabase/migrations/20260906180320_protect_payment_plan.sql'),
   read('supabase/migrations/20260906180615_harden_rls_and_indexes.sql'),
   read('supabase/migrations/20260906180928_limit_device_rpcs_to_anon.sql'),
+  read('supabase/migrations/20260909082331_add_native_family_sync.sql'),
+  read('supabase/migrations/20260909082808_add_device_revocation.sql'),
   read('native/src/context/naknak-context.tsx'),
   read('native/src/lib/notifications.native.ts'),
+  read('native/src/lib/family-sync.ts'),
+  read('native/src/app/onboarding/pairing.tsx'),
+  read('native/src/app/senior/home.tsx'),
+  read('native/src/app/senior/sos.tsx'),
 ]);
 
 const blankAnchors = [...dashboard.matchAll(/<a\b[^>]*target=["']_blank["'][^>]*>/gi)];
@@ -61,6 +67,13 @@ const checks = [
   ['database migration protects plan changes', planMigration.includes('protect_naknak_paid_plan') && planMigration.includes("request_role is distinct from 'service_role'")],
   ['database migration hardens RLS and indexes foreign keys', rlsMigration.includes('(select auth.uid())') && rlsMigration.includes('naknak_payment_events_household_id_idx') && !rlsMigration.includes('for all to authenticated')],
   ['paired-device RPCs are not granted to signed-in caregivers', rpcMigration.includes('from authenticated')],
+  ['native pairing stores only an opaque server credential', nativePairing.includes('private device key') && nativeFamilySync.includes('device_secret')],
+  ['native status sync is scoped to check-in and SOS', nativeFamilySync.includes("event: 'check_in_ok' | 'sos_opened'") && nativeSyncMigration.includes("p_event not in ('check_in_ok', 'sos_opened')")],
+  ['native sync updates one assigned senior instead of replacing household state', nativeSyncMigration.includes('v_senior_id') && nativeSyncMigration.includes("array['seniors', v_senior_index::text]") && !nativeFamilySync.includes('device_push_state')],
+  ['native home distinguishes server confirmation from local save', nativeHome.includes('confirmed in the caregiver dashboard') && nativeHome.includes('saved on this phone')],
+  ['native SOS does not imply guaranteed push delivery', nativeSos.includes('Hindi nito ginagarantiya na may push notification na natanggap.')],
+  ['native phone can revoke its own secret', nativeContext.includes('disconnectNativeDevice') && revocationMigration.includes('native_device_disconnect')],
+  ['caregiver can revoke a household device', dashboard.includes('revoke_household_device') && dashboard.includes('I-disconnect') && revocationMigration.includes('(select auth.uid())')],
   ['native reset cancels saved medication reminders', nativeContext.includes('cancelMedicationReminders(notificationIds)')],
   ['native reminder scheduling rolls back partial work', nativeNotifications.includes('await cancelMedicationReminders(notificationIds)')],
   ['website CTAs have real destinations', !/(?:Download the App|Get Started Free|Choose Essential|Choose Family)[\s\S]{0,80}href=["']#["']/.test(landing) && landing.includes('href="app.html"')],

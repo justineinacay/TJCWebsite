@@ -1,6 +1,6 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router } from 'expo-router';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Href, router } from 'expo-router';
+import { Alert, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 
 import { BottomNav } from '@/components/bottom-nav';
@@ -10,14 +10,27 @@ import { colors, radius, shadows, spacing, typography } from '@/constants/theme'
 import { useNakNak } from '@/context/naknak-context';
 
 export default function ProfileScreen() {
-  const { state, resetApp } = useNakNak();
+  const { state, familyConnection, disconnectFamily, resetApp } = useNakNak();
   const copy = COPY[state.profile.language];
   const editLabel = state.profile.language === 'en' ? 'Edit accessibility settings' : state.profile.language === 'ceb' ? 'Usba ang accessibility settings' : 'Baguhin ang accessibility settings';
-  const remoteTitle = state.profile.language === 'en' ? 'Needs a connection' : state.profile.language === 'ceb' ? 'Kinahanglan ug koneksyon' : 'Kailangan ng koneksyon';
+  const remoteTitle = familyConnection.status === 'connected'
+    ? state.profile.language === 'en' ? 'Connected to caregiver dashboard' : 'Connected sa caregiver dashboard'
+    : state.profile.language === 'en' ? 'Needs a connection' : state.profile.language === 'ceb' ? 'Kinahanglan ug koneksyon' : 'Kailangan ng koneksyon';
 
   const restart = async () => {
     await resetApp();
     router.replace('/');
+  };
+
+  const confirmDisconnect = () => {
+    Alert.alert(
+      'I-disconnect ang family dashboard?',
+      'Mananatili sa phone ang local contacts at gamot, pero hindi na maipapadala ang Ayos Ako at SOS status.',
+      [
+        { text: 'Kanselahin', style: 'cancel' },
+        { text: 'I-disconnect', style: 'destructive', onPress: () => void disconnectFamily() },
+      ],
+    );
   };
 
   return (
@@ -70,9 +83,21 @@ export default function ProfileScreen() {
           ))}
         </View>
 
-        <InfoPanel title={remoteTitle} tone="amber" icon={<MaterialCommunityIcons color={colors.amberDark} name="cloud-alert" size={22} />}>
-          {copy.caregiverNotSentDetail}
+        <InfoPanel
+          title={remoteTitle}
+          tone={familyConnection.status === 'connected' ? 'green' : 'amber'}
+          icon={<MaterialCommunityIcons color={familyConnection.status === 'connected' ? colors.greenDark : colors.amberDark} name={familyConnection.status === 'connected' ? 'cloud-check' : 'cloud-alert'} size={22} />}
+        >
+          {familyConnection.status === 'connected'
+            ? `Nakatalaga ang phone na ito kay ${familyConnection.seniorName || state.profile.name}. Ang Ayos Ako at SOS status ay ipinapadala lamang kapag kinumpirma ng server.`
+            : familyConnection.message || copy.caregiverNotSentDetail}
         </InfoPanel>
+
+        {familyConnection.status === 'connected' ? (
+          <SecondaryButton label="I-disconnect ang family dashboard" onPress={confirmDisconnect} tone="danger" />
+        ) : (
+          <SecondaryButton label="Ikonekta gamit ang Family Code" onPress={() => router.push('/onboarding/pairing' as Href)} />
+        )}
 
         <SecondaryButton label={copy.restartOnboarding} onPress={restart} tone="danger" />
       </ScrollView>

@@ -11,6 +11,15 @@ import {
 import { clearState, loadState, saveState } from '@/lib/storage';
 import { cancelMedicationReminders } from '@/lib/notifications';
 import {
+  checkFamilyConnection,
+  disconnectNativeDevice,
+  FamilyConnection,
+  FamilyCredentials,
+  pairNativeDevice,
+  reportNativeEvent,
+} from '@/lib/family-sync';
+import { clearFamilyCredentials, loadFamilyCredentials, saveFamilyCredentials } from '@/lib/sync-storage';
+import {
   AccessibilityNeed,
   EmergencyContact,
   INITIAL_STATE,
@@ -24,6 +33,7 @@ import {
 type NakNakContextValue = {
   state: NakNakState;
   loading: boolean;
+  familyConnection: FamilyConnection;
   setLanguage: (language: Language) => void;
   startRole: (role: Role) => void;
   setName: (name: string) => void;
@@ -32,8 +42,10 @@ type NakNakContextValue = {
   addContact: (contact: Omit<EmergencyContact, 'id' | 'primary'>) => void;
   addMedication: (medication: Omit<Medication, 'id' | 'createdAt'>) => void;
   markMedicationTaken: (medicationId: string) => void;
-  recordCheckIn: () => void;
-  recordSosOpened: () => void;
+  pairWithFamilyCode: (code: string) => Promise<void>;
+  disconnectFamily: () => Promise<void>;
+  recordCheckIn: () => Promise<boolean>;
+  recordSosOpened: () => Promise<boolean>;
   resetApp: () => Promise<void>;
 };
 
@@ -46,12 +58,18 @@ function createId(prefix: string) {
 export function NakNakProvider({ children }: PropsWithChildren) {
   const [state, setState] = useState<NakNakState>(INITIAL_STATE);
   const [loading, setLoading] = useState(true);
+  const [familyCredentials, setFamilyCredentials] = useState<FamilyCredentials | null>(null);
+  const [familyConnection, setFamilyConnection] = useState<FamilyConnection>({ status: 'local' });
 
   useEffect(() => {
     let active = true;
-    loadState()
-      .then((stored) => {
-        if (active) setState(stored);
+    Promise.all([loadState(), loadFamilyCredentials()])
+      .then(([stored, credentials]) => {
+        if (active) {
+          setState(stored);
+          setFamilyCredentials(credentials);
+          if (credentials) setFamilyConnection({ status: 'checking', seniorName: credentials.seniorName });
+        }
       })
       .finally(() => {
         if (active) setLoading(false);
@@ -60,6 +78,27 @@ export function NakNakProvider({ children }: PropsWithChildren) {
       active = false;
     };
   }, []);
+
+  useEffect(() => {
+    if (loading || !familyCredentials) return;
+    let active = true;
+    checkFamilyConnection(familyCredentials)
+      .then((connection) => {
+        if (active) setFamilyConnection(connection);
+      })
+      .catch((error: unknown) => {
+        if (active) {
+          setFamilyConnection({
+            status: 'error',
+            seniorName: familyCredentials.seniorName,
+            message: error instanceof Error ? error.message : 'Hindi makumpirma ang family connection.',
+          });
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [familyCredentials, loading]);
 
   useEffect(() => {
     if (!loading) void saveState(state);
@@ -151,7 +190,69 @@ export function NakNakProvider({ children }: PropsWithChildren) {
     [appendEvent, state.medications],
   );
 
-  const recordCheckIn = useCallback(() => {
+  const reportToFamily = useCallback(async (event: 'check_in_ok' | 'sos_opened', at: string) => {
+    if (!familyCredentials) return false;
+    try {
+      const delivered = await reportNativeEvent(familyCredentials, event, at);
+      if (delivered) {
+        setFamilyConnection({
+          status: 'connected',
+          seniorName: familyCredentials.seniorName,
+          lastConfirmedAt: new Date().toISOString(),
+        });
+      }
+      return delivered;
+    } catch (error) {
+      setFamilyConnection({
+        status: 'error',
+        seniorName: familyCredentials.seniorName,
+        message: error instanceof Error ? error.message : 'Naka-save sa phone pero hindi naipadala.',
+      });
+      return false;
+    }
+  }, [familyCredentials]);
+
+  const pairWithFamilyCode = useCallback(async (code: string) => {
+    setFamilyConnection({ status: 'checking' });
+    try {
+      const credentials = await pairNativeDevice(code, state.profile.name);
+      await saveFamilyCredentials(credentials);
+      setFamilyCredentials(credentials);
+      setFamilyConnection({
+        status: 'connected',
+        seniorName: credentials.seniorName,
+        lastConfirmedAt: new Date().toISOString(),
+      });
+    } catch (error) {
+      setFamilyConnection({
+        status: 'error',
+        message: error instanceof Error ? error.message : 'Hindi makakonekta gamit ang Family Code.',
+      });
+      throw error;
+    }
+  }, [state.profile.name]);
+
+  const disconnectFamily = useCallback(async () => {
+    const credentials = familyCredentials;
+    let remotelyRevoked = !credentials;
+    if (credentials) {
+      try {
+        remotelyRevoked = await disconnectNativeDevice(credentials);
+      } catch {
+        remotelyRevoked = false;
+      }
+    }
+    await clearFamilyCredentials();
+    setFamilyCredentials(null);
+    setFamilyConnection(remotelyRevoked
+      ? { status: 'local' }
+      : {
+          status: 'error',
+          message: 'Naka-disconnect ang phone. Tanggalin din ang lumang device sa caregiver dashboard kapag online.',
+        });
+  }, [familyCredentials]);
+
+  const recordCheckIn = useCallback(async () => {
     const now = new Date().toISOString();
     setState((current) => ({
       ...current,
@@ -161,28 +262,44 @@ export function NakNakProvider({ children }: PropsWithChildren) {
         ...current.events,
       ].slice(0, 100),
     }));
-  }, []);
+    return reportToFamily('check_in_ok', now);
+  }, [reportToFamily]);
 
-  const recordSosOpened = useCallback(() => {
+  const recordSosOpened = useCallback(async () => {
+    const now = new Date().toISOString();
     appendEvent({ type: 'sos_opened', detail: 'Emergency screen opened locally' });
-  }, [appendEvent]);
+    return reportToFamily('sos_opened', now);
+  }, [appendEvent, reportToFamily]);
 
   const resetApp = useCallback(async () => {
     const notificationIds = state.medications.flatMap((medication) => medication.notificationIds);
     await cancelMedicationReminders(notificationIds);
+    if (familyCredentials) {
+      try {
+        await disconnectNativeDevice(familyCredentials);
+      } catch {
+        // Reset must still work offline; a caregiver can revoke the stale row later.
+      }
+    }
+    await clearFamilyCredentials();
     await clearState();
+    setFamilyCredentials(null);
+    setFamilyConnection({ status: 'local' });
     setState(INITIAL_STATE);
-  }, [state.medications]);
+  }, [familyCredentials, state.medications]);
 
   const value = useMemo<NakNakContextValue>(
     () => ({
       state,
       loading,
+      familyConnection,
       setLanguage,
       startRole,
       setName,
       finishSeniorOnboarding,
       finishCaregiverOnboarding,
+      pairWithFamilyCode,
+      disconnectFamily,
       addContact,
       addMedication,
       markMedicationTaken,
@@ -195,8 +312,11 @@ export function NakNakProvider({ children }: PropsWithChildren) {
       addMedication,
       finishCaregiverOnboarding,
       finishSeniorOnboarding,
+      familyConnection,
       loading,
       markMedicationTaken,
+      pairWithFamilyCode,
+      disconnectFamily,
       recordCheckIn,
       recordSosOpened,
       resetApp,

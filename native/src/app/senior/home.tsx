@@ -35,10 +35,16 @@ export default function SeniorHomeScreen() {
       : 'Binubuksan ang emergency screen at direktang mga tawag.';
 
   const checkIn = async () => {
-    recordCheckIn();
+    const delivered = await recordCheckIn();
     setCheckInMessage(
-      state.profile.language === 'en'
-        ? 'Check-in saved on this phone.'
+      delivered
+        ? state.profile.language === 'en'
+          ? 'Check-in confirmed in the caregiver dashboard.'
+          : state.profile.language === 'ceb'
+            ? 'Nakumpirma ang check-in sa caregiver dashboard.'
+            : 'Nakumpirma ang check-in sa caregiver dashboard.'
+        : state.profile.language === 'en'
+          ? 'Check-in saved on this phone.'
         : state.profile.language === 'ceb'
           ? 'Naka-save niini nga phone ang imong check-in.'
           : 'Naka-save sa phone ang check-in mo.',

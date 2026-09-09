@@ -11,7 +11,9 @@ This folder contains the Expo/React Native version of NakNak. It extends the exi
 - Flexible windows for morning, noon, afternoon, evening, and bedtime
 - On-device medication reminders when notification permission is granted
 - On-device profile, medication, contact, check-in, and SOS-event storage
-- Honest Caregiver/Anak preview that does not imply remote alerts are connected
+- Optional Family Code pairing with an assigned Senior/PWD record
+- Server-confirmed Ayos Ako and SOS-opened status in the Caregiver/Anak dashboard
+- Secure local storage for the opaque device credential and revocation from either device
 
 ## Capability boundaries
 
@@ -20,12 +22,13 @@ This folder contains the Expo/React Native version of NakNak. It extends the exi
 | Direct phone call | Implemented through the device dialer |
 | Local medication reminder | Implemented on the device |
 | Offline app data | Implemented on the device |
-| Caregiver remote push | Not connected yet |
+| Caregiver dashboard status | Ayos Ako and SOS-opened status only |
+| Caregiver remote push | Not implemented |
 | SMS or automatic calling | Not implemented |
 | Automatic location sharing | Not implemented |
 | Fall detection | Not implemented |
 
-The operating system and mobile carrier ultimately control whether a call can be placed. Local reminders and calling must be verified on physical iOS and Android devices before release.
+Medication schedules, contacts, and location remain local to the phone; they are not synced by the Family Code milestone. The operating system and mobile carrier ultimately control whether a call can be placed. Local reminders, calling, and a real two-device dashboard flow must be verified on physical iOS and Android devices before release.
 
 ## Run locally
 

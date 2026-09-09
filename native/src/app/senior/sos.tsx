@@ -15,6 +15,7 @@ export default function SosScreen() {
   const { state, recordSosOpened } = useNakNak();
   const recorded = useRef(false);
   const [callError, setCallError] = useState('');
+  const [delivery, setDelivery] = useState<'sending' | 'delivered' | 'local'>('sending');
   const copy = COPY[state.profile.language];
   const primaryContact = state.contacts.find((contact) => contact.primary) ?? state.contacts[0];
   const dialerHint = state.profile.language === 'en'
@@ -26,7 +27,7 @@ export default function SosScreen() {
   useEffect(() => {
     if (recorded.current) return;
     recorded.current = true;
-    recordSosOpened();
+    void recordSosOpened().then((delivered) => setDelivery(delivered ? 'delivered' : 'local'));
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Warning).catch(() => undefined);
   }, [recordSosOpened]);
 
@@ -53,8 +54,16 @@ export default function SosScreen() {
         <InfoPanel title={copy.savedLocally} tone="green" icon={<MaterialCommunityIcons color={colors.greenDark} name="cellphone-check" size={23} />}>
           {copy.savedLocallyDetail}
         </InfoPanel>
-        <InfoPanel title={copy.caregiverNotSent} tone="amber" icon={<MaterialCommunityIcons color={colors.amberDark} name="cloud-alert" size={23} />}>
-          {copy.caregiverNotSentDetail}
+        <InfoPanel
+          title={delivery === 'delivered' ? 'Nasa caregiver dashboard na' : delivery === 'sending' ? 'Kinukumpirma ang connection' : copy.caregiverNotSent}
+          tone={delivery === 'delivered' ? 'green' : 'amber'}
+          icon={<MaterialCommunityIcons color={delivery === 'delivered' ? colors.greenDark : colors.amberDark} name={delivery === 'delivered' ? 'cloud-check' : 'cloud-alert'} size={23} />}
+        >
+          {delivery === 'delivered'
+            ? 'Kinumpirma ng NakNak server ang SOS sa caregiver dashboard. Hindi nito ginagarantiya na may push notification na natanggap.'
+            : delivery === 'sending'
+              ? 'Naka-save na sa phone habang hinihintay ang kumpirmasyon ng server.'
+              : copy.caregiverNotSentDetail}
         </InfoPanel>
         <InfoPanel title={copy.locationNotShared} tone="neutral" icon={<MaterialCommunityIcons color={colors.inkMuted} name="map-marker-off" size={23} />}>
           {copy.locationNotSharedDetail}

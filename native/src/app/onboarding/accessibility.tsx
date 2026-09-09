@@ -1,5 +1,5 @@
 import MaterialCommunityIcons from '@expo/vector-icons/MaterialCommunityIcons';
-import { router } from 'expo-router';
+import { Href, router } from 'expo-router';
 import { useState } from 'react';
 import { Pressable, StyleSheet, Text, View } from 'react-native';
 
@@ -23,8 +23,9 @@ export default function AccessibilityOnboardingScreen() {
   };
 
   const finish = () => {
+    const editingExistingProfile = state.profile.onboarded;
     finishSeniorOnboarding(selected);
-    router.replace('/senior/home');
+    router.replace((editingExistingProfile ? '/senior/home' : '/onboarding/pairing') as Href);
   };
 
   return (

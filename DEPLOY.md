@@ -5,9 +5,9 @@ NakNak currently has three deliverables:
 - `index.html` — public website
 - `dashboard.html` — Supabase-connected Caregiver / Anak dashboard
 - `naknak-app.html` — generated Senior / PWD web beta; `app.html` is its stable entry point
-- `native/` — Expo iOS/Android project, still local-first and not yet connected to the dashboard
+- `native/` — Expo iOS/Android project; local-first with optional Family Code status sync
 
-Do not describe the native build as remotely connected until that integration and a real two-device test are complete.
+The native sync milestone sends only server-confirmed Ayos Ako and SOS-opened status to the assigned Senior/PWD dashboard record. It does not provide push/SMS alerts, medication/contact sync, location sharing, or fall detection. Do not describe it more broadly until those capabilities and a real two-device test are complete.
 
 ## 1. Build and verify the web files
 
@@ -24,11 +24,13 @@ The generated `naknak-app.html` is committed because GitHub Pages serves static 
 
 Project ref: `louqshzgqutxydfqgnyz`
 
-For a fresh project, run `naknak_schema.sql`. For the existing production project, retain the ordered files in `supabase/migrations/`, including:
+For a fresh project, run `naknak_schema.sql`, then apply every ordered file in `supabase/migrations/`. For the existing production project, retain the ordered migrations, including:
 
 1. `20260906180320_protect_payment_plan.sql`
 2. `20260906180615_harden_rls_and_indexes.sql`
 3. `20260906180928_limit_device_rpcs_to_anon.sql`
+4. `20260909082331_add_native_family_sync.sql`
+5. `20260909082808_add_device_revocation.sql`
 
 The Caregiver / Anak dashboard signs in with a Supabase magic link and uses RLS-scoped table access. The Senior / PWD web beta pairs with a temporary family code and then uses an opaque device secret through narrowly granted RPC functions.
 
@@ -63,7 +65,7 @@ GitHub Pages does not allow repository code to set all production response heade
 
 ## 5. Release gates that still require real devices or provider access
 
-- Complete native-to-dashboard pairing and synchronization, or ship the native milestone explicitly as local-only.
+- Complete a real two-device test of Family Code pairing, Ayos Ako delivery, SOS-opened delivery, app-side disconnect, and caregiver-side device revocation.
 - Test SOS direct calling, notification permissions, reminder delivery, cancellation, and app reset on a physical iPhone.
 - Test two real devices for Caregiver / Anak and Senior / PWD synchronization.
 - Complete a PayMongo test-mode checkout and signed webhook delivery.

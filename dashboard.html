@@ -324,6 +324,7 @@ button{cursor:pointer;}
 .panel-head{display:flex;align-items:center;justify-content:space-between;margin-bottom:20px;gap:12px;flex-wrap:wrap;}
 .panel-head h2{font-family:var(--font-display);font-size:18px;font-weight:600;display:flex;align-items:center;gap:9px;}
 .panel-head p{font-size:12.5px;color:var(--ink3);font-weight:600;margin-top:2px;}
+.form-error{margin:0 0 14px;padding:11px 13px;border:1px solid rgba(196,48,30,0.28);border-radius:12px;background:rgba(196,48,30,0.08);color:var(--red-dark);font-size:12.5px;font-weight:750;line-height:1.45;}
 .btn-add{display:flex;align-items:center;gap:7px;padding:10px 18px;border-radius:999px;background:var(--cream2);border:1.5px solid var(--card-border);font-weight:800;font-size:12.5px;color:var(--ink2);transition:all 0.15s;}
 .btn-add:hover{border-color:var(--accent);color:var(--accent);}
 
@@ -1558,7 +1559,7 @@ function Dashboard({ household, onDisconnect, theme, session }) {
           {tab==="notes" && <div key="notes" className="panel-enter"><NotesPanel senior={senior} patch={patch}/></div>}
           {tab==="letters" && <div key="letters" className="panel-enter"><LettersPanel household={household} session={session}/></div>}
           {tab==="profile" && <div key="profile" className="panel-enter"><ProfilePanel senior={senior} patch={patch} draft={profileDraft} setDraft={setProfileDraft}/></div>}
-          {tab==="devices" && <div key="devices" className="panel-enter"><DevicesPanel household={household}/></div>}
+          {tab==="devices" && <div key="devices" className="panel-enter"><DevicesPanel household={household} seniors={seniors}/></div>}
           {tab==="calendar" && <div key="calendar" className="panel-enter"><CalendarPanel senior={senior} patch={patch}/></div>}
           {tab==="timeline" && <div key="timeline" className="panel-enter"><TimelinePanel senior={senior}/></div>}
           {tab==="idupload" && <div key="idupload" className="panel-enter"><IdUploadPanel senior={senior} patch={patch}/></div>}
@@ -2488,14 +2489,16 @@ function CalEventModal({ initial, onSave, onDelete, onClose }) {
   );
 }
 
-function DevicesPanel({ household }) {
+function DevicesPanel({ household, seniors }) {
   const [devices, setDevices] = useState(null);
   const [code, setCode] = useState(household.pairCode);
   const [busy, setBusy] = useState(false);
+  const [revokingId, setRevokingId] = useState(null);
+  const [error, setError] = useState("");
   const [copied, setCopied] = useState(false);
 
   const load = async () => {
-    const { data } = await supa.from("naknak_devices").select("id,device_label,paired_at,last_seen_at").eq("household_id", household.householdId).order("paired_at",{ascending:false});
+    const { data } = await supa.from("naknak_devices").select("id,device_label,senior_id,paired_at,last_seen_at").eq("household_id", household.householdId).order("paired_at",{ascending:false});
     setDevices(data||[]);
   };
   useEffect(()=>{ load(); }, [household.householdId]);
@@ -2507,6 +2510,15 @@ function DevicesPanel({ household }) {
     if(!error) setCode(data);
   };
   const copy = () => { navigator.clipboard && navigator.clipboard.writeText(code); setCopied(true); setTimeout(()=>setCopied(false),1800); };
+  const revokeDevice = async (device) => {
+    const seniorName = seniors.find(s=>s.id===device.senior_id)?.name;
+    if(!window.confirm(`I-disconnect ang ${device.device_label}${seniorName?` ni ${seniorName}`:""}? Hindi na makakapagpadala ng status ang device na ito.`)) return;
+    setRevokingId(device.id); setError("");
+    const { data, error: revokeError } = await supa.rpc("revoke_household_device", { p_household_id: household.householdId, p_device_id: device.id });
+    setRevokingId(null);
+    if(revokeError || data!==true) { setError(revokeError?.message||"Hindi ma-disconnect ang device. Subukan ulit."); return; }
+    await load();
+  };
 
   return (
     <>
@@ -2521,12 +2533,14 @@ function DevicesPanel({ household }) {
       </div>
       <div className="panel">
         <div className="panel-head"><h2><Icon name="dashboard" size={17}/>Mga Naka-pair na Device</h2></div>
+        {error && <div className="form-error" role="alert">{error}</div>}
         {devices===null ? <div className="empty-state"><div className="loading-spin"></div></div> :
          devices.length===0 ? <div className="empty-state"><Icon name="phone" size={36}/><p>Wala pang naka-pair na telepono.</p></div> :
          devices.map(d=>(
           <div className="row-item" key={d.id}>
             <div className="row-avatar" style={{background:"var(--cream2)",color:"var(--ink2)"}}><Icon name="phone" size={16}/></div>
-            <div className="row-body"><div className="t1">{d.device_label}</div><div className="t2">Na-pair {fmtTime(d.paired_at)} · Huling online {fmtTime(d.last_seen_at)}</div></div>
+            <div className="row-body"><div className="t1">{d.device_label}</div><div className="t2">{d.senior_id?`Para kay ${seniors.find(s=>s.id===d.senior_id)?.name||"Senior / PWD"} · `:""}Na-pair {fmtTime(d.paired_at)} · Huling online {fmtTime(d.last_seen_at)}</div></div>
+            <button className="id-upload-btn danger" disabled={revokingId===d.id} onClick={()=>revokeDevice(d)}><Icon name="trash" size={13}/>{revokingId===d.id?"Tinatanggal…":"I-disconnect"}</button>
           </div>
         ))}
       </div>

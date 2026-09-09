@@ -88,13 +88,17 @@ have to complete an email OAuth flow to ask for help. Instead:
 
 1. The caregiver's dashboard generates a 6-character pair code
    (`pair_code`), valid for **48 hours**.
-2. The phone redeems that code once, via the `pair_device` RPC function.
-3. That function validates the code and hands back a private
+2. The web beta redeems that code via `pair_device`; the native app uses
+   `pair_native_device`, which also assigns the device to one Senior/PWD.
+3. The pairing function validates the code and hands back a private
    **device_secret** — a 24-byte random value the phone stores locally
    and never displays.
-4. From then on, every read (`device_get_state`) and write
-   (`device_push_state`) presents that secret. Each function
-   independently validates it before touching any data.
+4. The web beta's reads/writes use `device_get_state` and
+   `device_push_state`. The native app instead uses the narrower
+   `native_device_get_status` and `native_device_report` functions; only
+   Ayos Ako and SOS-opened events are accepted, and only the assigned
+   Senior/PWD JSON record is changed. Every function independently
+   validates the opaque secret before touching data.
 
 The phone has **zero direct table access**. The anon API key alone gets
 it nothing — every anon-callable function validates its own secret
@@ -119,12 +123,12 @@ first. This is enforced by explicit `revoke`/`grant` statements in
 These are real, current limitations. If you're deploying this for
 production use with real families, read this section before you do.
 
-- **No per-device revocation yet.** If a phone is lost, the caregiver
-  can regenerate the household's pair code from the dashboard, which
-  stops *new* devices from pairing — but the lost phone's existing
-  `device_secret` keeps working until it's manually revoked in the
-  Supabase table editor (`naknak_devices`). A "revoke this device"
-  button in the dashboard is the natural next addition.
+- **Device revocation is implemented.** A connected native phone can
+  revoke its own opaque secret from Profile, and an authenticated
+  household member can disconnect a lost or retired phone from the
+  dashboard. If the phone disconnects while offline, its local secret is
+  still erased and the dashboard explains the remaining caregiver-side
+  revocation path.
 - **No rate limiting on `pair_device` beyond Supabase's platform
   defaults.** A script could still brute-force 6-character codes at
   whatever rate Supabase's own abuse protection allows. A dedicated
@@ -154,11 +158,12 @@ production use with real families, read this section before you do.
       project (all tables, RLS policies, and RPC functions).
 - [ ] Confirm **Authentication → URL Configuration → Site URL** points
       to your real deployed domain, not `localhost` (see `DEPLOY.md`).
-- [ ] Decide on and implement a per-device revocation flow before
-      onboarding families who might lose a phone.
+- [ ] Test both phone-side disconnect and caregiver-side revocation with
+      two real devices before onboarding families.
 - [ ] Complete a PayMongo test-mode checkout and verify the signed webhook,
       plan change, audit event, and duplicate-delivery behavior end to end.
-- [ ] Complete native-to-dashboard synchronization or publish the native
-      milestone explicitly as local-only.
+- [ ] Verify Family Code pairing plus Ayos Ako and SOS-opened delivery on
+      two real devices; medication, contacts, push, and location are not
+      part of this sync milestone.
 - [ ] Test SOS calling, reminders, notification cancellation, geolocation,
       and offline relaunch on a physical iPhone before TestFlight release.
